@@ -105,6 +105,26 @@ main {
 .btn-primary:hover { background: var(--primary-hover); }
 .btn-primary:active { transform: scale(0.98); }
 
+.kb-hint {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.btn-reset {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-reset:hover { color: var(--text); }
+
 .result-section { margin-top: 24px; }
 
 .tabs {
@@ -171,6 +191,22 @@ footer {
   font-size: 13px;
 }
 
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 999;
+  animation: toastIn 0.3s ease, toastOut 0.3s ease 1.2s forwards;
+}
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
+@keyframes toastOut { to { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+
 @media (max-width: 480px) {
   header { padding: 24px 12px 16px; }
   header h1 { font-size: 24px; }
@@ -204,6 +240,8 @@ footer {
       </div>
     </div>
     <button id="generate-btn" class="btn-primary">生成周报</button>
+    <span class="kb-hint">快捷键：Ctrl + Enter</span>
+    <button id="reset-btn" class="btn-reset" style="display:none;">清空重填</button>
   </section>
 
   <section id="result-section" class="result-section" style="display:none;">
@@ -321,6 +359,217 @@ ${kw.length > 1 ? `围绕${kw.slice(0,3).join('、')}等方向` : `围绕${kw[0]
     ],
   },
 };
+
+// Utility: pick random element from array
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Utility: parse keywords from user input
+function parseKeywords(raw) {
+  return raw
+    .split(/[,，、\s\n]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+// Shuffle array (Fisher-Yates) and return first n
+function sample(arr, n) {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, Math.min(n, shuffled.length));
+}
+
+// Main generation function
+function generateReport(keywords, department, position) {
+  const kw = parseKeywords(keywords);
+  if (kw.length === 0) return { concise: '', formal: '', data: '' };
+
+  const dept = department.trim() || '某部门';
+  const pos = position.trim() || '员工';
+
+  const bodyKeywords = kw.length >= 3 ? sample(kw, Math.min(kw.length, 5)) : kw;
+
+  function build(style) {
+    const t = templates[style];
+    const parts = [];
+
+    parts.push(pick(t.opening)(kw, dept, pos));
+
+    bodyKeywords.forEach((k, i) => {
+      parts.push(pick(t.bodyItem)(k, i + 1));
+    });
+
+    parts.push(pick(t.closing)(kw, dept, pos));
+
+    return parts.join(style === 'concise' ? '\n\n' : '');
+  }
+
+  return {
+    concise: build('concise'),
+    formal: build('formal'),
+    data: build('data'),
+  };
+}
+
+// State
+let currentReports = { concise: '', formal: '', data: '' };
+let currentStyle = 'concise';
+
+// DOM refs
+const keywordsEl = document.getElementById('keywords');
+const departmentEl = document.getElementById('department');
+const positionEl = document.getElementById('position');
+const generateBtn = document.getElementById('generate-btn');
+const resetBtn = document.getElementById('reset-btn');
+const resultSection = document.getElementById('result-section');
+const reportContent = document.getElementById('report-content');
+const copyBtn = document.getElementById('copy-btn');
+const exportBtn = document.getElementById('export-btn');
+const tabs = document.querySelectorAll('.tab');
+
+// Display report
+function showReport(style) {
+  reportContent.textContent = currentReports[style] || '生成失败，请重试。';
+}
+
+// Generate handler
+generateBtn.addEventListener('click', () => {
+  const keywords = keywordsEl.value.trim();
+  if (!keywords) {
+    keywordsEl.focus();
+    keywordsEl.style.borderColor = '#ef4444';
+    setTimeout(() => { keywordsEl.style.borderColor = ''; }, 1500);
+    return;
+  }
+
+  generateBtn.textContent = '正在生成...';
+  generateBtn.disabled = true;
+
+  // Small delay so the button state change renders before generation
+  setTimeout(() => {
+    currentReports = generateReport(
+      keywords,
+      departmentEl.value,
+      positionEl.value
+    );
+
+    resultSection.style.display = 'block';
+    showReport(currentStyle);
+    resultSection.scrollIntoView({ behavior: 'smooth' });
+
+    generateBtn.textContent = '重新生成';
+    generateBtn.disabled = false;
+    resetBtn.style.display = 'block';
+  }, 100);
+});
+
+// Reset handler
+resetBtn.addEventListener('click', () => {
+  keywordsEl.value = '';
+  departmentEl.value = '';
+  positionEl.value = '';
+  resultSection.style.display = 'none';
+  resetBtn.style.display = 'none';
+  generateBtn.textContent = '生成周报';
+  // Reset tab to first
+  tabs.forEach(t => t.classList.remove('active'));
+  tabs[0].classList.add('active');
+  currentStyle = 'concise';
+  currentReports = { concise: '', formal: '', data: '' };
+});
+
+// Keyboard shortcut: Ctrl+Enter to generate
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    generateBtn.click();
+  }
+});
+
+// Tab switching
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentStyle = tab.dataset.style;
+    showReport(currentStyle);
+  });
+});
+
+// Toast helper
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => document.body.removeChild(toast), 1600);
+}
+
+// Copy to clipboard
+copyBtn.addEventListener('click', async () => {
+  const text = currentReports[currentStyle];
+  if (!text) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  showToast('已复制到剪贴板');
+});
+
+// Export as image
+exportBtn.addEventListener('click', async () => {
+  const text = currentReports[currentStyle];
+  if (!text) return;
+
+  exportBtn.textContent = '生成中...';
+  exportBtn.disabled = true;
+
+  try {
+    const container = document.createElement('div');
+    container.style.cssText = `
+      position: fixed; left: -9999px; top: 0;
+      width: 600px; padding: 40px;
+      background: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 15px; line-height: 2; color: #1e293b;
+      white-space: pre-wrap; word-break: break-word;
+    `;
+    container.textContent = text;
+    document.body.appendChild(container);
+
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    });
+    document.body.removeChild(container);
+
+    const link = document.createElement('a');
+    link.download = `周报_${new Date().toLocaleDateString('zh-CN')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('导出成功');
+  } catch (err) {
+    alert('导出失败，请重试。');
+    console.error('Export error:', err);
+  } finally {
+    exportBtn.textContent = '导出长图';
+    exportBtn.disabled = false;
+  }
+});
 </script>
 </body>
 </html>
