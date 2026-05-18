@@ -450,7 +450,8 @@ async function getReports(keywordsRaw, department, position) {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     return { source: 'ai', concise: data.concise, formal: data.formal, data: data.data };
-  } catch {
+  } catch (err) {
+    console.error('API generate failed, falling back to template:', err);
     return {
       source: 'template',
       ...generateReport(keywordsRaw, department, position),
