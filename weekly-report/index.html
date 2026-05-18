@@ -436,8 +436,30 @@ function showReport(style) {
   reportContent.textContent = currentReports[style] || '生成失败，请重试。';
 }
 
+// Async generate: try API first, fallback to template
+async function getReports(keywordsRaw, department, position) {
+  const kwList = parseKeywords(keywordsRaw);
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keywords: kwList, department, position }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return { source: 'ai', concise: data.concise, formal: data.formal, data: data.data };
+  } catch {
+    return {
+      source: 'template',
+      ...generateReport(keywordsRaw, department, position),
+    };
+  }
+}
+
 // Generate handler
-generateBtn.addEventListener('click', () => {
+generateBtn.addEventListener('click', async () => {
   const keywords = keywordsEl.value.trim();
   if (!keywords) {
     keywordsEl.focus();
@@ -449,22 +471,23 @@ generateBtn.addEventListener('click', () => {
   generateBtn.textContent = '正在生成...';
   generateBtn.disabled = true;
 
-  // Small delay so the button state change renders before generation
-  setTimeout(() => {
-    currentReports = generateReport(
-      keywords,
-      departmentEl.value,
-      positionEl.value
-    );
+  currentReports = await getReports(
+    keywords,
+    departmentEl.value,
+    positionEl.value
+  );
 
-    resultSection.style.display = 'block';
-    showReport(currentStyle);
-    resultSection.scrollIntoView({ behavior: 'smooth' });
+  resultSection.style.display = 'block';
+  showReport(currentStyle);
+  resultSection.scrollIntoView({ behavior: 'smooth' });
 
-    generateBtn.textContent = '重新生成';
-    generateBtn.disabled = false;
-    resetBtn.style.display = 'block';
-  }, 100);
+  generateBtn.textContent = '重新生成';
+  generateBtn.disabled = false;
+  resetBtn.style.display = 'block';
+
+  if (currentReports.source === 'template') {
+    showToast('已切换至离线模式');
+  }
 });
 
 // Reset handler
