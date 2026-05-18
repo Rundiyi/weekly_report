@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周报生成器 - 打工效率指南</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  text-align: center;
+  padding: 32px 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+header h1 { font-size: 28px; font-weight: 700; }
+header .subtitle { font-size: 14px; opacity: 0.85; margin-top: 6px; }
+
+main {
+  flex: 1;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+.input-section {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px 20px;
+}
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+.form-group textarea,
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  background: #fafafa;
+}
+.form-group textarea:focus,
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: white;
+}
+.form-group .hint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px 24px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:active { transform: scale(0.98); }
+
+.result-section { margin-top: 24px; }
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+.tab {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.tab.active {
+  background: var(--primary);
+  color: white;
+}
+
+.report-content {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 24px;
+  font-size: 15px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 200px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.btn-secondary {
+  flex: 1;
+  padding: 10px 20px;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+
+footer {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  header { padding: 24px 12px 16px; }
+  header h1 { font-size: 24px; }
+  .form-row { grid-template-columns: 1fr; }
+  .tabs { flex-direction: column; gap: 4px; }
+  .actions { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>周报生成器</h1>
+  <p class="subtitle">输入关键词，一键生成三种风格周报</p>
+</header>
+
+<main>
+  <section class="input-section">
+    <div class="form-group">
+      <label for="keywords">本周工作关键词</label>
+      <textarea id="keywords" placeholder="例如：Q2复盘、客户拜访、合同签署、活动策划" rows="3"></textarea>
+      <span class="hint">多个关键词用逗号、空格或顿号分隔</span>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="department">部门</label>
+        <input type="text" id="department" placeholder="例如：市场部">
+      </div>
+      <div class="form-group">
+        <label for="position">职位</label>
+        <input type="text" id="position" placeholder="例如：运营专员">
+      </div>
+    </div>
+    <button id="generate-btn" class="btn-primary">生成周报</button>
+  </section>
+
+  <section id="result-section" class="result-section" style="display:none;">
+    <div class="tabs">
+      <button class="tab active" data-style="concise">简洁版</button>
+      <button class="tab" data-style="formal">正式汇报版</button>
+      <button class="tab" data-style="data">数据重点版</button>
+    </div>
+    <div id="report-content" class="report-content"></div>
+    <div class="actions">
+      <button id="copy-btn" class="btn-secondary">一键复制</button>
+      <button id="export-btn" class="btn-secondary">导出长图</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>打工效率指南 · 让写周报不再头疼</p>
+</footer>
+
+<script>
+// All JS logic will be added in subsequent tasks
+</script>
+</body>
+</html>
